@@ -1,0 +1,14 @@
+{
+    "name": "trueadvisor-scraper",
+    "version": "1.0.0",
+    "description": "Scrapes all advisors from TrueAdvisor using adaptive tiling",
+    "main": "src/main.js",
+    "type": "module",
+    "dependencies": {
+        "apify": "^3.0.0",
+        "got-scraping": "^4.0.0"
+    },
+    "scripts": {
+        "start": "node src/main.js"
+    }
+}
