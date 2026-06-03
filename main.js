@@ -52,7 +52,6 @@ const allTiles = [
 
 log.info(`Total tiles: ${allTiles.length.toLocaleString()}`);
 log.info(`Concurrency: ${CONCURRENCY}`);
-log.info(`Est. time: ~${Math.round(allTiles.length*1.2/CONCURRENCY/60)} minutes`);
 
 async function fetchTile({ swLat, swLng, neLat, neLng }, attempt = 0) {
   const url = `${BASE}/api/map-search/?ne_lat=${neLat}&ne_lng=${neLng}&sw_lat=${swLat}&sw_lng=${swLng}&type=advisors&portfolio=${PORTFOLIO}&skip_count=true`;
@@ -142,16 +141,21 @@ async function processOne(tile) {
 
   if (advisors.length >= API_CAP) {
     capped++;
-    tiles(tile.swLat, tile.neLat, tile.swLng, tile.neLng, 0.01)
+    // Sub-tile size = 1/5 of parent tile size (max 100 sub-tiles per parent)
+    const latSpan  = r6(tile.neLat - tile.swLat);
+    const lngSpan  = r6(tile.neLng - tile.swLng);
+    const subStep  = r6(Math.max(latSpan / 5, 0.005));
+    tiles(tile.swLat, tile.neLat, tile.swLng, tile.neLng, subStep)
       .forEach(t => extraTiles.push(t));
   }
 
   done++;
+  const totalTiles = allTiles.length;
   if (done % 100 === 0) {
     const elapsed = (Date.now()-start)/1000;
     const rate    = done / elapsed;
-    const remaining = Math.round((allTiles.length - done) / rate);
-    log.info(`[${done}/${allTiles.length}] ${total.toLocaleString()} advisors | ${rate.toFixed(1)} tiles/s | ~${remaining}s left`);
+    const remaining = Math.round((totalTiles - done) / rate);
+    log.info(`[${done}/${totalTiles}] ${total.toLocaleString()} advisors | ${rate.toFixed(1)} tiles/s | ~${Math.max(0,remaining)}s left`);
   }
 
   if (DELAY_MS > 0) await new Promise(r => setTimeout(r, DELAY_MS));
@@ -170,10 +174,10 @@ async function runPool(tileList) {
 
 log.info('=== PASS 1: Main tile grid ===');
 await runPool(allTiles);
-log.info(`Pass 1 done. ${total.toLocaleString()} advisors. ${capped} capped tiles → ${extraTiles.length} sub-tiles queued.`);
+log.info(`Pass 1 done. ${total.toLocaleString()} advisors. ${capped} capped tiles → ${extraTiles.length.toLocaleString()} sub-tiles queued.`);
 
 if (extraTiles.length > 0) {
-  log.info(`=== PASS 2: ${extraTiles.length.toLocaleString()} sub-tiles for dense areas ===`);
+  log.info(`=== PASS 2: ${extraTiles.length.toLocaleString()} sub-tiles ===`);
   await runPool(extraTiles);
   log.info(`Pass 2 done. ${total.toLocaleString()} total advisors.`);
 }
